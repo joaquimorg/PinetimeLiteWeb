@@ -1,5 +1,5 @@
 <template>  
-    <div class="p-4">
+    <div class="p-2">
         <h1>Pinetime Lite OS Downloads <i class="bi bi-cloud-arrow-down"></i></h1>
         <hr />
         <h3>Pinetime Lite Current versions</h3>
@@ -12,9 +12,9 @@
         <hr />
         <h4>More information on the Github page</h4>
         <i class="bi bi-github"></i> <a class="text-white" target="_bank" href="https://github.com/joaquimorg/PinetimeLite">Pinetime Lite OS</a>
-        <div class="card bg-dark m-4 text-start">
+        <div class="card bg-dark my-4 text-start">
             <div class="card-body">
-                <markdown-it-vue-light :content="body" />
+                <markdown-it-vue-light :content="body" class="md-links"/>
             </div>
         </div>
     </div>
@@ -58,5 +58,7 @@ export default {
 </script>
 
 <style>
-
+.md-links a, .md-links a:hover {
+    color: blue;
+}
 </style>

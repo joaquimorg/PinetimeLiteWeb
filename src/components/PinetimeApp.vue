@@ -1,5 +1,5 @@
 <template>  
-    <div>
+    <div class="m-2">
       <h1>Pinetime Lite OS</h1>
 
       <transition name="fade">

@@ -8,7 +8,7 @@
         d="M4 1.667v.383A2.5 2.5 0 0 0 2 4.5v7a2.5 2.5 0 0 0 2 2.45v.383C4 15.253 4.746 16 5.667 16h4.666c.92 0 1.667-.746 1.667-1.667v-.383a2.5 2.5 0 0 0 2-2.45V8h.5a.5.5 0 0 0 .5-.5v-2a.5.5 0 0 0-.5-.5H14v-.5a2.5 2.5 0 0 0-2-2.45v-.383C12 .747 11.254 0 10.333 0H5.667C4.747 0 4 .746 4 1.667zM4.5 3h7A1.5 1.5 0 0 1 13 4.5v7a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 3 11.5v-7A1.5 1.5 0 0 1 4.5 3z" />
     </svg>    
 
-    <div class="pinetime-container d-flex w-100 h-100 p-3 mx-auto flex-column">
+    <div class="pinetime-container d-flex w-100 h-100 py-3 mx-auto flex-column">
       <header class="mb-auto">
         <div>
           <h3 class="float-md-start mb-0"><i class="bi bi-smartwatch"></i> Pinetime Lite</h3>
@@ -24,11 +24,11 @@
           </nav>
         </div>
       </header>
-      <main class="px-3">        
+      <main class="py-3">        
         <PinetimeApp v-if="currPage == 'home'" />
         <PinetimeDownload v-if="currPage == 'download'" />
       </main>
-      <footer class="mt-auto text-white-50">
+      <footer class="mt-auto text-white-50 p-3">
         <p id="footer_info" class="show">
           The PineTime is a open source smartwatch capable of running custom-built open operating systems, like <a
             target="_bank" class="text-white" href="https://github.com/joaquimorg/PinetimeLite">Pinetime Lite OS</a>. Some
