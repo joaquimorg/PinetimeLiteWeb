@@ -9,7 +9,10 @@
   },
   "dependencies": {
     "core-js": "^3.6.5",
-    "vue": "^2.6.11"
+    "markdown-it-vue": "^1.1.6",
+    "vue": "^2.6.11",
+    "vue-toast-notification": "^0.6.1",
+    "vue-webble": "^0.1.0"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "~4.5.0",
