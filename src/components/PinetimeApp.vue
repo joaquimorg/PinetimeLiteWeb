@@ -152,8 +152,23 @@
                 <p class="card-text text-success">{{fileSourceName}}</p>
                 <p v-if="fileVersion != null" class="card-text text-info">Resource version {{fileVersion}}</p>
               </div>
-              <button @click="fileUpload" v-if="canUploadFile" class="btn btn-success btn-sm m-3">Upload Resource</button>
-              <button @click="closeOption" v-if="!isUploading" class="btn btn-light btn-sm m-3">Cancel</button>
+              <div v-if="canUploadFile && deviceVersion > '0.3.0'">
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="flexSwitchSpeed" id="flexSwitchSpeed1" value="240" v-model="mtuSize">
+                  <label class="form-check-label" for="flexSwitchSpeed1">
+                    Use High-Speed transfer
+                  </label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="flexSwitchSpeed" id="flexSwitchSpeed2" value="20" v-model="mtuSize">
+                  <label class="form-check-label" for="flexSwitchSpeed2">
+                    Use normal transfer speed
+                  </label>
+                </div>
+                <div v-if="mtuSize == 240" class="text-muted"><small>if you experience errors use the normal transfer speed.</small></div>
+              </div>
+              <button @click="fileUpload" v-if="canUploadFile" class="btn btn-success m-3"><i class="bi bi-cloud-arrow-up"></i> Upload Resource</button>
+              <button @click="closeOption" v-if="!isUploading" class="btn btn-light m-3">Cancel</button>
               <div v-if="isUploading" class="mb-3">
                 <h2 class="h5 m-2">Uploading resource file</h2>
                 <div class="progress">
@@ -179,8 +194,23 @@
                 <p class="card-text text-success">{{fileSourceName}}</p>
                 <p v-if="fileVersion != null" class="card-text text-info">Bootloader version {{fileVersion}}</p>
               </div>
-              <button @click="fileUpload" v-if="canUploadFile" class="btn btn-success btn-sm m-3">Upload Bootloader</button>
-              <button @click="closeOption" v-if="!isUploading" class="btn btn-light btn-sm m-3">Cancel</button>
+              <div v-if="canUploadFile && deviceVersion > '0.3.0'">
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="flexSwitchSpeed" id="flexSwitchSpeed1" value="240" v-model="mtuSize">
+                  <label class="form-check-label" for="flexSwitchSpeed1">
+                    Use High-Speed transfer
+                  </label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="flexSwitchSpeed" id="flexSwitchSpeed2" value="20" v-model="mtuSize">
+                  <label class="form-check-label" for="flexSwitchSpeed2">
+                    Use normal transfer speed
+                  </label>
+                </div>
+                <div v-if="mtuSize == 240" class="text-muted"><small>if you experience errors use the normal transfer speed.</small></div>
+              </div>
+              <button @click="fileUpload" v-if="canUploadFile" class="btn btn-success m-3"><i class="bi bi-cloud-arrow-up"></i> Upload Bootloader</button>
+              <button @click="closeOption" v-if="!isUploading" class="btn btn-light m-3">Cancel</button>
               <div v-if="isUploading" class="mb-3">
                 <h2 class="h5 m-2">Uploading bootloader file</h2>
                 <div class="progress">
@@ -206,8 +236,23 @@
                 <p class="card-text text-success">{{fileSourceName}}</p>
                 <p v-if="fileVersion != null" class="card-text text-info">Firmware version {{fileVersion}}</p>
               </div>
-              <button @click="fileUpload" v-if="canUploadFile" class="btn btn-success btn-sm m-3">Upload Firmware</button>
-              <button @click="closeOption" v-if="!isUploading" class="btn btn-light btn-sm m-3">Cancel</button>
+              <div v-if="canUploadFile && deviceVersion > '0.3.0'">
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="flexSwitchSpeed" id="flexSwitchSpeed1" value="240" v-model="mtuSize">
+                  <label class="form-check-label" for="flexSwitchSpeed1">
+                    Use High-Speed transfer
+                  </label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio" name="flexSwitchSpeed" id="flexSwitchSpeed2" value="20" v-model="mtuSize">
+                  <label class="form-check-label" for="flexSwitchSpeed2">
+                    Use normal transfer speed
+                  </label>
+                </div>
+                <div v-if="mtuSize == 240" class="text-muted"><small>if you experience errors use the normal transfer speed.</small></div>
+              </div>
+              <button @click="fileUpload" v-if="canUploadFile" class="btn btn-success m-3"><i class="bi bi-cloud-arrow-up"></i> Upload Firmware</button>
+              <button @click="closeOption" v-if="!isUploading" class="btn btn-light m-3">Cancel</button>
               <div v-if="isUploading" class="mb-3">
                 <h2 class="h5 m-2">Uploading firmware file</h2>
                 <div class="progress">
@@ -265,6 +310,7 @@ export default {
       canUploadFile: false,
       isUploading: false,
       uploadingPercentage: 0,
+      mtuSize: 240,
 
     };
   },
@@ -366,9 +412,12 @@ export default {
         const characteristic2 = await service.getCharacteristic(0x2A26);
         const value2 = await characteristic2.readValue();
         this.deviceVersion = this.decode(value2);
-        if( this.deviceVersion < "0.3.0") {
+        if(this.deviceVersion < "0.3.0") {
           this.msgError( "You Pinetime Lite version is not supported by this application, some options may not work properly!" );
           this.deviceVersionError = true;
+        }
+        if(this.deviceVersion == "0.3.0") {
+          this.mtuSize = 20;
         }
 
       }).catch(error => {
@@ -387,6 +436,7 @@ export default {
         });
         
         this.fileServiceData = await service.getCharacteristic("00021000-78fc-48fe-8e23-433b3a1942d0");
+
       }).catch(error => {
         this.msgError( "getDeviceFileCharacteristic: " + error );
       });
@@ -544,9 +594,9 @@ export default {
     },
 
     async fileUpload() {
-      if ( this.batteryLevel < 15 ) {
-        this.msgError( "The battery level is very low, charge the smartwatch first before proceeding with the update." );
-      } else {
+      //if ( this.batteryLevel < 15 ) {
+        //this.msgError( "The battery level is very low, charge the smartwatch first before proceeding with the update." );
+      //} else {
         this.canUploadFile = false;
         this.isUploading = true;
         
@@ -557,7 +607,7 @@ export default {
           this.msgError( error );
           this.isUploading = false;
         }
-      }
+      //}
     },
     toBytesInt32 (num) {
       let arr = new Uint8Array([
@@ -658,7 +708,7 @@ export default {
       return new Promise(resolve => setTimeout(resolve, ms));
     },
     fileSend() {
-      let packetLength = 20;
+      let packetLength = this.mtuSize;
       
       // going from 0 to len
       let firmwareProgress = 0;
@@ -697,39 +747,44 @@ export default {
     },
 
     handleFileNotifications(event) {
-      let value = event.target.value;
-      if( value.getUint8(0) == 0x01 ) {
-        switch (value.getUint8(1)) {
-          case 0x01: // COMMAND_FIRMWARE_INIT
-            // sends data...
-            this.fileSend();
-            break;
-          case 0x06: // COMMAND_FIRMWARE_END_DATA
-            // sends checksum...
-            this.fileSendCheckSum();
-            break;
-          case 0x09: // COMMAND_FIRMWARE_CHECKSUM_ERR
-            this.isUploading = false;
-            this.msgError("Problem with the firmware, checksum error.");
-            break;
-          case 0x08: // COMMAND_FIRMWARE_ERROR
-            this.isUploading = false;
-            this.msgError("Problem with the firmware, download error.");
-            break;
-          case 0x07: // COMMAND_FIRMWARE_OK
-            this.isUploading = false;
-            this.uploadingPercentage = 100;
-            this.msgSuccess("Firmware installation complete.");
-            this.closeOption();
-            break;
-          default:
-            this.msgError("Unexpected response during firmware update: [" + value.getUint8(1) + "]");
-            this.isUploading = false;
-            break;
+      try {
+        let value = event.target.value;
+        if( value.getUint8(0) == 0x01 ) {
+          switch (value.getUint8(1)) {
+            case 0x01: // COMMAND_FIRMWARE_INIT
+              // sends data...
+              this.fileSend();
+              break;
+            case 0x06: // COMMAND_FIRMWARE_END_DATA
+              // sends checksum...
+              this.fileSendCheckSum();
+              break;
+            case 0x09: // COMMAND_FIRMWARE_CHECKSUM_ERR
+              this.isUploading = false;
+              this.msgError("Problem with the firmware, checksum error.");
+              break;
+            case 0x08: // COMMAND_FIRMWARE_ERROR
+              this.isUploading = false;
+              this.msgError("Problem with the firmware, download error.");
+              break;
+            case 0x07: // COMMAND_FIRMWARE_OK
+              this.isUploading = false;
+              this.uploadingPercentage = 100;
+              this.msgSuccess("Firmware installation complete.");
+              this.closeOption();
+              break;
+            default:
+              this.msgError("Unexpected response during firmware update: [" + value.getUint8(1) + "]");
+              this.isUploading = false;
+              break;
+          }
+        } else {
+          this.isUploading = false;
+          this.msgError("Error sending file to smartwatch. [" + value.getUint8(0) + "] [" + value.getUint8(1) + "]");
         }
-      } else {
+      } catch( error ) {
+        this.msgError( "handleFileNotifications: " + error );
         this.isUploading = false;
-        this.msgError("Error sending file to smartwatch. [" + value.getUint8(0) + "] [" + value.getUint8(1) + "]");
       }
     },
 
