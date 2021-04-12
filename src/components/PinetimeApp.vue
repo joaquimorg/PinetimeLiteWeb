@@ -456,7 +456,7 @@ export default {
     async setTime() {
       await this.device.gatt.getPrimaryService(0x1805).then(service => {
         service.getCharacteristic(0x2A2B).then(characteristic => {
-          characteristic.writeValue(this.dateToArray(new Date())).then(_ => {                    
+          characteristic.writeValueWithoutResponse(this.dateToArray(new Date())).then(_ => {                    
             if(_) null;
             this.msgSuccess("The time on the smartwatch has been updated.");
           });
@@ -646,7 +646,7 @@ export default {
         header[5] = 0x03;
       }
 
-      await this.fileServiceControl.writeValue(header);
+      await this.fileServiceControl.writeValueWithoutResponse(header);
     },
 
     getCRC16() {
@@ -672,7 +672,7 @@ export default {
       header[1] = crc16[1];
       header[2] = crc16[0];
 
-      await this.fileServiceControl.writeValue(header);
+      await this.fileServiceControl.writeValueWithoutResponse(header);
     },
 
     fileSendCommand( command ) {
@@ -680,9 +680,11 @@ export default {
         if (this.fileServiceControl != null) {
           let header = new Uint8Array(1);
           header[0] = command;
-          this.fileServiceControl.writeValue(header).then(_ => {
+          this.fileServiceControl.writeValueWithoutResponse(header).then(_ => {
             if(_) null;
             resolve();
+          }).catch( error =>  {
+            reject("fileSendCommand : " + error)
           });
         } else {
           reject("No control file service.")
@@ -694,9 +696,11 @@ export default {
     fileSendData( data ) {
      let p = new Promise((resolve, reject) => {
         if (this.fileServiceData != null) {
-          this.fileServiceData.writeValue(data).then(_ => {
+          this.fileServiceData.writeValueWithoutResponse(data).then(_ => {
             if(_) null;
             resolve();
+          }).catch( error =>  {
+            reject("fileSendData : " + error)
           });
         } else {
           reject("No write file service.")
@@ -708,42 +712,52 @@ export default {
       return new Promise(resolve => setTimeout(resolve, ms));
     },
     fileSend() {
-      let packetLength = this.mtuSize;
-      
+      let packetLength = parseInt(this.mtuSize);
+
       // going from 0 to len
       let firmwareProgress = 0;
-      let chunked = [];
-      let chunkCount = 0;
-      Array.from({length: Math.ceil(this.fileSource.byteLength / packetLength)}, (val, i) => {
-        chunked.push(this.fileSource.slice(i * packetLength, i * packetLength + packetLength))
-      });
       
-      // COMMAND_FIRMWARE_START_DATA
-      this.fileSendCommand( 0x03 ).then( async _ => {
-        if(_) null;
-        let sending = false;
-        // send data...
-        while(firmwareProgress < this.fileSource.byteLength) {
-          if(sending === false) {
-            sending = true;
-            let element = chunked[chunkCount++];
-            this.fileSendData(element).then(_ => {
-              if(_) null;
-              firmwareProgress += element.length;
-              this.uploadingPercentage = ((firmwareProgress / this.fileSource.byteLength) * 100).toFixed(0);
-              sending = false;
-            });
-          } else {
-            await this.sleep(5);
-          }
-        }
-        
-        // COMMAND_FIRMWARE_END_DATA
-        this.fileSendCommand( 0x06 ).then(_ => {
+      try {
+        // COMMAND_FIRMWARE_START_DATA
+        this.fileSendCommand( 0x03 ).then( async _ => {
           if(_) null;
-        });
-
-      });
+          let sending = false;
+          await this.sleep(5);
+          // send data...
+          while(firmwareProgress < this.fileSource.byteLength) {
+            if(sending === false) {
+              sending = true;
+              let element = this.fileSource.slice(firmwareProgress, firmwareProgress + packetLength);
+              this.fileSendData(element).then(_ => {
+                if(_) null;
+                firmwareProgress += element.length;
+                this.uploadingPercentage = ((firmwareProgress / this.fileSource.byteLength) * 100).toFixed(0);
+                sending = false;
+              }).catch( error =>  {
+                this.msgError( "fileSend data - " + error );
+                this.isUploading = false;
+              });
+            } else {
+              await this.sleep(5);
+            }
+          }
+          await this.sleep(5);
+          // COMMAND_FIRMWARE_END_DATA
+          this.fileSendCommand( 0x06 ).then( async _ => {
+            if(_) null;
+            await this.sleep(5);
+          }).catch( error =>  {
+                this.msgError( "_END_DATA - " + error );
+                this.isUploading = false;
+              });       
+        }).catch( error =>  {
+                this.msgError( "_START_DATA - " + error );
+                this.isUploading = false;
+              });
+      } catch( error ) {
+        this.msgError( "fileSend: " + error );
+        this.isUploading = false;
+      }
     },
 
     handleFileNotifications(event) {
