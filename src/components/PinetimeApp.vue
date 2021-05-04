@@ -106,7 +106,17 @@
                   </div>
                 </div>
               </div>
-              <div class="col-sm"></div>
+              <div v-if="fileServiceReady" class="col-sm">
+                <div class="card mb-3">
+                  <div class="card-header bg-light">
+                    <h2 class="h5 m-0"><i class="bi bi-folder"></i> File Explorer</h2>
+                  </div>
+                  <div class="card-body">
+                    <p class="card-text">Smartwatch's File Explorer.</p>
+                    <button @click="showFiles" class="btn btn-success">File Explorer</button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="row">
@@ -146,7 +156,7 @@
               <p class="card-text text-warning">Please note that this action is not reversible, the current resource in the smartwatch will be overwritten.</p>
               <div v-if="!showFileName" class="mb-3">
                 <label for="resourcesFile" class="form-label">Select the resources file (*.res)</label>
-                <input @change="requestUploadFile" class="form-control" type="file" id="uploadFile" accept=".res">
+                <input @change="requestUpload" class="form-control" type="file" id="uploadFile" accept=".res">
               </div>
               <div v-if="showFileName" class="mb-3">
                 <p class="card-text text-success">{{fileSourceName}}</p>
@@ -188,7 +198,7 @@
               <p class="card-text text-danger">Attention, you must choose a specific bootloader for <strong>Pinetime Lite</strong>, the use of another non-compatible one can make your smartwatch <strong>bricked</strong>.<br />The application does not validate the bootloader compatibility.</p>
               <div v-if="!showFileName" class="mb-3">
                 <label for="bootloaderFile" class="form-label">Select the bootloader file (*.bot)</label>
-                <input @change="requestUploadFile" class="form-control" type="file" id="uploadFile" accept=".bot">
+                <input @change="requestUpload" class="form-control" type="file" id="uploadFile" accept=".bot">
               </div>
               <div v-if="showFileName" class="mb-3">
                 <p class="card-text text-success">{{fileSourceName}}</p>
@@ -230,7 +240,7 @@
               <p class="card-text text-danger">Attention, you must choose a specific firmware for <strong>Pinetime Lite</strong>, the use of another non-compatible one can make your smartwatch <strong>bricked</strong>.<br />The application does not validate the firmware compatibility.</p>
               <div v-if="!showFileName" class="mb-3">
                 <label for="bootloaderFile" class="form-label">Select the firmware file (*.fw)</label>
-                <input @change="requestUploadFile" class="form-control" type="file" id="uploadFile" accept=".fw">
+                <input @change="requestUpload" class="form-control" type="file" id="uploadFile" accept=".fw">
               </div>
               <div v-if="showFileName" class="mb-3">
                 <p class="card-text text-success">{{fileSourceName}}</p>
@@ -271,6 +281,34 @@
             <div class="card-body">
               <p class="card-text">Change settings and click save to sync to smartwatch.</p>
               <button @click="closeOption" v-if="!isUploading" class="btn btn-light btn-sm m-3">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="showOption === 'Files'">
+          <div class="card mb-3">
+            <div class="card-header bg-light">
+              <h2 class="h5 m-0"><i class="bi bi-folder"></i> File Explorer</h2>
+            </div>
+            <div class="card-body">
+              <p class="card-text">Smartwatch file explorer.</p>
+              <div v-if="!showFileName" class="mb-3">
+                <label for="bootloaderFile" class="form-label">Select the file to upload</label>
+                <input @change="requestUploadFile" class="form-control" type="file" id="uploadFile" multiple>
+              </div>
+              <div v-if="showFileName" class="mb-3">
+                <p class="card-text text-success">{{fileSourceName}}</p>
+              </div>
+
+              <button @click="closeOption" v-if="!isUploading" class="btn btn-light btn-sm m-3">Cancel</button>
+
+              <div v-if="isUploading" class="mb-3">
+                <h2 class="h5 m-2">Uploading file</h2>
+                <div class="progress">
+                  <div class="progress-bar" role="progressbar" v-bind:style="{width: uploadingPercentage + '%'}" v-bind:aria-valuenow="uploadingPercentage" aria-valuemin="0" aria-valuemax="100">{{uploadingPercentage}}%</div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
@@ -511,12 +549,83 @@ export default {
       this.showMenu = false;
       this.showOption = 'Settings';
     },
+    showFiles() {
+      this.showMenu = false;
+      this.showOption = 'Files';
+    },
 
-    requestUploadFile() {
+    requestUpload() {
       var src = this.$el.querySelector('#uploadFile');
       this.processFile(src.files);
     },
 
+    requestUploadFile() {
+      var src = this.$el.querySelector('#uploadFile');
+      this.processExplorerFile(src.files);
+    },
+
+    processExplorerFile(files){
+      this.showFileName = true;
+      this.fileSourceName = '';
+      this.isUploading = true;
+      files.forEach(async file => {
+        this.fileSourceName += file.name + ' ';
+        let reader = new FileReader();
+        reader.onload = f => {
+          if ( f.target.result.byteLength > 0 ) {
+            this.fileSource = new Uint8Array(f.target.result);
+            // Send file
+            this.sendExplorerFile(file.name);
+          } else {
+            this.msgError( "Selected file is empty." );
+            this.isUploading = false;
+          }         
+        };
+        reader.onerror = function() {
+          this.msgError( "Failed to read file!\n\n" + reader.error);
+          reader.abort();
+          this.isUploading = false;
+        };
+        reader.readAsArrayBuffer(file);
+        while(this.isUploading) {
+          await this.sleep(5);
+        }
+      });
+    },
+    async sendExplorerFile( fileName ) {
+      try {
+        await this.fileExplorerWriteHeader( fileName );
+        //this.isUploading = false;
+      } catch(error) {
+        this.msgError( error );
+        this.isUploading = false;
+      }
+    },
+    strToBuffer (string) {
+      return new TextEncoder("utf-8").encode(string);
+    },
+    async fileExplorerWriteHeader( fileName ) {
+
+      let fileSize = this.toBytesInt32(this.fileSource.byteLength);
+            
+      fileName = '/' + fileName;
+      let name = this.strToBuffer(fileName);
+
+      let header = new Uint8Array(8 + name.length);
+      
+      header[0] = 0x21; // COMMAND_FILE_INIT
+      header[1] = 0x2; // type - create dir = 1 / create file = 2 / delete = 9
+      header[2] = name.length;
+      header[3] = fileSize[3];
+      header[4] = fileSize[2];
+      header[5] = fileSize[1];
+      header[6] = fileSize[0];
+      header.set(name, 7);
+      header[header.length - 1] = 0x00;
+
+      await this.fileServiceControl.writeValueWithoutResponse(header);
+    },
+    // ------------------------------------------------------------------------------------------------------
     processFile(files){
       // allows only 1 file
       if (files.length === 1) {
@@ -536,7 +645,7 @@ export default {
           this.msgError( "Failed to read file!\n\n" + reader.error);
           reader.abort();
         };
-        reader.onerror
+        
         reader.readAsArrayBuffer(file);
         
       } else {
@@ -760,6 +869,57 @@ export default {
       }
     },
 
+    fileExplorerSend() {
+      let packetLength = parseInt(this.mtuSize);
+
+      // going from 0 to len
+      let firmwareProgress = 0;
+      
+      try {
+        // COMMAND_FILE_START_DATA
+        this.fileSendCommand( 0x22 ).then( async _ => {
+          if(_) null;
+          let sending = false;
+          await this.sleep(5);
+          // send data...
+          while(firmwareProgress < this.fileSource.byteLength) {
+            if(sending === false) {
+              sending = true;
+              let element = this.fileSource.slice(firmwareProgress, firmwareProgress + packetLength);
+              this.fileSendData(element).then(_ => {
+                if(_) null;
+                firmwareProgress += element.length;
+                this.uploadingPercentage = ((firmwareProgress / this.fileSource.byteLength) * 100).toFixed(0);
+                sending = false;
+              }).catch( error =>  {
+                this.msgError( "fileSend data - " + error );
+                this.isUploading = false;
+              });
+            } else {
+              await this.sleep(5);
+            }
+          }
+          await this.sleep(5);
+          // COMMAND_FILE_END
+          this.fileSendCommand( 0x23 ).then( async _ => {
+            if(_) null;
+            await this.sleep(5);
+          }).catch( error =>  {
+                this.msgError( "_END_DATA - " + error );
+                this.isUploading = false;
+              });       
+        }).catch( error =>  {
+                this.msgError( "_START_DATA - " + error );
+                this.isUploading = false;
+              });
+      } catch( error ) {
+        this.msgError( "fileSend: " + error );
+        this.isUploading = false;
+      }
+    },
+
+    // ------------------------------------------------------------------------------------------------------
+
     handleFileNotifications(event) {
       try {
         let value = event.target.value;
@@ -787,6 +947,20 @@ export default {
               this.msgSuccess("Firmware installation complete.");
               this.closeOption();
               break;
+            case 0x22: //COMMAND_FILE_START_DATA
+              // send file
+              this.fileExplorerSend();
+            break;
+            case 0x23: //COMMAND_FILE_END
+              this.isUploading = false;
+              this.uploadingPercentage = 100;
+              this.msgSuccess("File upload completed.");
+            break;
+            case 0x24: //COMMAND_FILE_ERROR
+              this.isUploading = false;
+              this.msgError("Problem with file upload.");
+            break;
+
             default:
               this.msgError("Unexpected response during firmware update: [" + value.getUint8(1) + "]");
               this.isUploading = false;
