@@ -106,7 +106,17 @@
                   </div>
                 </div>
               </div>
-              <div class="col-sm"></div>
+              <div v-if="fileServiceReady" class="col-sm">
+                <div class="card mb-3">
+                  <div class="card-header bg-light">
+                    <h2 class="h5 m-0"><i class="bi bi-camera"></i> Screenshot</h2>
+                  </div>
+                  <div class="card-body">
+                    <p class="card-text">Option to get smartwatch's Screenshot.</p>
+                    <button @click="showScreenshot" class="btn btn-success">Screenshot</button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="row">
@@ -275,6 +285,23 @@
           </div>
         </div>
 
+        <div v-if="showOption === 'Screenshot'">
+          <div class="card mb-3">
+            <div class="card-header bg-light">
+              <h2 class="h5 m-0"><i class="bi bi-sliders"></i> Screenshot</h2>
+            </div>
+            <div class="card-body">
+              <button @click="takeScreenshot" v-if="canTakeScreenshot" class="btn btn-warning m-3"><i class="bi bi-camera"></i> Take Screenshot</button>
+              <button @click="getScreenshotAction" class="btn btn-success m-3"><i class="bi bi-camera"></i> Get Screenshot</button>
+              <br />
+              <canvas id="screenShotCanvas" width="240" height="240"></canvas>
+              <p class="card-text"><span v-if="screenshotReady" >Screenshot Ready !</span></p>
+              <button @click="saveScreenshot" v-if="screenShotSave" class="btn btn-light btn-sm m-3">Save</button>
+              <button @click="closeOption" v-if="!isUploading" class="btn btn-light btn-sm m-3">Cancel</button>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 </template>
@@ -311,6 +338,17 @@ export default {
       isUploading: false,
       uploadingPercentage: 0,
       mtuSize: 240,
+
+      canTakeScreenshot: true,
+      screenShot: null,
+      screenShotCanvas: null,
+      screenShotSize: 0,
+      screenShotSave: false,
+      getScreenshot: false,
+      screenshotReady: false,
+      screenShotCV: null,
+      sX: 0,
+      sY: 0,
 
     };
   },
@@ -493,6 +531,8 @@ export default {
       this.canUploadFile = false;
       this.isUploading = false;
       this.uploadingPercentage = 0;
+      this.canTakeScreenshot = true;
+      this.getScreenshot = false;
     },
 
     showResource() {
@@ -510,6 +550,11 @@ export default {
     showSettings() {
       this.showMenu = false;
       this.showOption = 'Settings';
+    },
+
+    showScreenshot() {
+      this.showMenu = false;
+      this.showOption = 'Screenshot';
     },
 
     requestUploadFile() {
@@ -760,42 +805,141 @@ export default {
       }
     },
 
+    saveScreenshot() {
+      let dataURL = this.screenShotCV.toDataURL("image/png");
+      let newTab = window.open('about:blank','image from canvas');
+      newTab.document.write("<img src='" + dataURL + "' alt='from canvas'/>");
+    },
+    takeScreenshot() {
+      // COMMAND_SCREEN_SHOT
+      this.fileSendCommand( 0x30 ).then( async _ => {
+        if(_) null;
+      }).catch( error =>  {
+        this.msgError( "takeScreenshot - " + error );
+        this.canTakeScreenshot = true;
+        this.getScreenshot = false;
+        this.screenshotReady = false;
+      });
+    },
+
+    getScreenshotAction() {
+      // COMMAND_SCREEN_SHOT_GET
+      this.fileSendCommand( 0x31 ).then( async _ => {
+        if(_) null;
+        this.screenShot = new Uint8Array((240*240) * 2);
+        this.screenShot.fill(0xff);
+        this.canTakeScreenshot = false;
+        
+      }).catch( error =>  {
+        this.msgError( "takeScreenshot - " + error );
+        this.canTakeScreenshot = true;
+        this.getScreenshot = false;
+        this.screenshotReady = false;
+      });
+    },
+    bswap16(x) { return ((x>>8)&255)|((x&255)<<8) },
+    refreshCanvas() {
+      let c = 0;
+      let sX = 0;
+      let sY = 0;
+      for(var i=0; i<  this.screenShot.byteLength / 2; i++){
+        
+        let b1 =  this.screenShot[c++];
+        let b2 =  this.screenShot[c++];
+        let b16 = this.bswap16(b2 + (b1 << 8));
+
+        let r = ((((b16 >> 11) & 0x1F) * 527) + 23) >> 6;
+        let g = ((((b16 >> 5) & 0x3F) * 259) + 33) >> 6;
+        let b = (((b16 & 0x1F) * 527) + 23) >> 6;
+    
+        this.screenShotCanvas.fillStyle = "rgba("+r+","+g+","+b+", 1)";  
+        this.screenShotCanvas.fillRect( sX, sY, 1, 1 );
+        sX++;
+        if ( sX >= 240 ) {
+          sX = 0;
+          sY++;
+        }
+      }
+    },
+    async getScreenShoot() {
+            
+      this.screenShotCV = document.getElementById("screenShotCanvas");
+      this.screenShotCanvas = this.screenShotCV.getContext("2d");
+
+      this.getScreenshot = true;
+      this.screenShotSize = 0;
+      this.screenShotSave = false;
+      console.log('\nScreenshot Start\n');
+      while (this.getScreenshot) {
+
+        await this.fileServiceData.readValue().then(value => {
+
+          for (let index = 0; index < value.byteLength; index++) {
+            this.screenShot[this.screenShotSize + index] = value.getUint8(index);
+          }
+          
+          this.screenShotSize += value.byteLength;
+          if ( this.screenShotSize >= (240*240) * 2) {
+            this.canTakeScreenshot = true;
+            this.getScreenshot = false;
+            this.screenshotReady = false;
+            this.screenShotSave = true;
+            console.log('\nScreenshot end.\n');
+            console.log(this.screenShotSize + '\n');
+          }
+          //console.log(this.screenShotSize + '\n');
+        });
+        //await this.sleep(1);
+        this.refreshCanvas();
+      }
+      this.refreshCanvas();
+    },
+
     handleFileNotifications(event) {
       try {
-        let value = event.target.value;
-        if( value.getUint8(0) == 0x01 ) {
-          switch (value.getUint8(1)) {
-            case 0x01: // COMMAND_FIRMWARE_INIT
-              // sends data...
-              this.fileSend();
-              break;
-            case 0x06: // COMMAND_FIRMWARE_END_DATA
-              // sends checksum...
-              this.fileSendCheckSum();
-              break;
-            case 0x09: // COMMAND_FIRMWARE_CHECKSUM_ERR
-              this.isUploading = false;
-              this.msgError("Problem with the firmware, checksum error.");
-              break;
-            case 0x08: // COMMAND_FIRMWARE_ERROR
-              this.isUploading = false;
-              this.msgError("Problem with the firmware, download error.");
-              break;
-            case 0x07: // COMMAND_FIRMWARE_OK
-              this.isUploading = false;
-              this.uploadingPercentage = 100;
-              this.msgSuccess("Firmware installation complete.");
-              this.closeOption();
-              break;
-            default:
-              this.msgError("Unexpected response during firmware update: [" + value.getUint8(1) + "]");
-              this.isUploading = false;
-              break;
+          let value = event.target.value;
+          if( value.getUint8(0) == 0x01 ) {
+            switch (value.getUint8(1)) {
+              case 0x01: // COMMAND_FIRMWARE_INIT
+                // sends data...
+                this.fileSend();
+                break;
+              case 0x06: // COMMAND_FIRMWARE_END_DATA
+                // sends checksum...
+                this.fileSendCheckSum();
+                break;
+              case 0x09: // COMMAND_FIRMWARE_CHECKSUM_ERR
+                this.isUploading = false;
+                this.msgError("Problem with the firmware, checksum error.");
+                break;
+              case 0x08: // COMMAND_FIRMWARE_ERROR
+                this.isUploading = false;
+                this.msgError("Problem with the firmware, download error.");
+                break;
+              case 0x07: // COMMAND_FIRMWARE_OK
+                this.isUploading = false;
+                this.uploadingPercentage = 100;
+                this.msgSuccess("Firmware installation complete.");
+                this.closeOption();
+                break;
+              case 0x30: // COMMAND_SCREEN_SHOT
+                this.screenshotReady = true;
+                break;
+              case 0x31: // COMMAND_SCREEN_SHOT_GET
+                if (!this.getScreenshot) {
+                  this.getScreenShoot();
+                }
+                break;
+              default:
+                this.msgError("Unexpected response during firmware update: [" + value.getUint8(1) + "]");
+                this.isUploading = false;
+                break;
+            }
+          } else {
+            this.isUploading = false;
+            this.msgError("Error sending file to smartwatch. [" + value.getUint8(0) + "] [" + value.getUint8(1) + "]");
           }
-        } else {
-          this.isUploading = false;
-          this.msgError("Error sending file to smartwatch. [" + value.getUint8(0) + "] [" + value.getUint8(1) + "]");
-        }
+  
       } catch( error ) {
         this.msgError( "handleFileNotifications: " + error );
         this.isUploading = false;
